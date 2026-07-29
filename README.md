@@ -71,8 +71,8 @@ agent failures in production.
 ## Install
 
 ```bash
-pip install agent-ready                 # core
-pip install "agent-ready[mcp]"          # + MCP scaffold generation
+pip install openapi-agent-ready                 # core
+pip install "openapi-agent-ready[mcp]"          # + MCP scaffold generation
 ```
 
 From source:

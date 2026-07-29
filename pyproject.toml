@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agent-ready"
+name = "openapi-agent-ready"
 version = "0.1.0"
 description = "Audit any OpenAPI spec for AI-agent and MCP readiness, and generate an MCP server scaffold."
 readme = "README.md"
