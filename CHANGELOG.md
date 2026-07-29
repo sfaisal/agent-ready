@@ -3,9 +3,14 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.1.0] - 2026-07-29
 
-## [0.1.0] - 2026-07-28
+First release, published to PyPI as `openapi-agent-ready`.
+
+> The distribution name differs from the repo name: PyPI rejected `agent-ready`
+> as too similar to the existing `agentready` package. The import name
+> (`agent_ready`) and CLI command (`agent-ready`) are unaffected.
+
 
 ### Added
 - Seven-category AI-readiness rubric for OpenAPI specs
@@ -36,3 +41,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   weighted at 50% of their category so a single whole-API finding isn't averaged
   away against hundreds of endpoint findings. Stripe's tool-surface score was
   99/100 before this fix and 49.6/100 after.
+
+### Changed
+- Distribution name is now `openapi-agent-ready` (PyPI collision with
+  `agentready`). Import name, CLI command, and repo name unchanged.
