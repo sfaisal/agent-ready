@@ -14,23 +14,24 @@ agent-specific failure, tells you exactly which endpoints will cause trouble and
 why, and can gate a CI pipeline so specs don't regress.
 
 ```bash
-pip install agent-ready
+pip install openapi-agent-ready
 agent-ready https://example.com/openapi.yaml
 ```
 
 ```
 Generic Booking Platform API (v1.0)
-AI-readiness score: 54.4/100
-Endpoints: 4  Fails: 6  Warnings: 12
+AI-readiness score: 58.4/100
+Endpoints: 4  Fails: 7  Warnings: 14
 
 Category scores:
-  Description Clarity            37.5/100
-  Side Effects                   70.0/100
-  Error Responses                62.5/100
-  Auth Clarity                   50.0/100
-  Ambiguity                     100.0/100
-  Parameter Explanation          16.7/100
-  Usage Guidelines               50.0/100
+  Description Clarity           37.5/100
+  Side Effects                  70.0/100
+  Error Responses               62.5/100
+  Auth Clarity                  50.0/100
+  Ambiguity                    100.0/100
+  Parameter Explanation         10.0/100
+  Usage Guidelines              50.0/100
+  Tool Surface                 100.0/100
 ```
 
 ## Why this exists
@@ -71,8 +72,8 @@ agent failures in production.
 ## Install
 
 ```bash
-pip install openapi-agent-ready                 # core
-pip install "openapi-agent-ready[mcp]"          # + MCP scaffold generation
+pip install openapi-agent-ready             # core
+pip install "openapi-agent-ready[mcp]"      # + MCP scaffold generation
 ```
 
 From source:
@@ -110,7 +111,7 @@ regress when someone adds an endpoint:
 ```yaml
 - name: Check API is agent-ready
   run: |
-    pip install agent-ready
+    pip install openapi-agent-ready
     agent-ready openapi.yaml --min-score 60 --max-fails 0
 ```
 
@@ -129,12 +130,16 @@ Exit codes:
 
 ## Real-world results
 
-Running it against Stripe's production spec (587 endpoints):
+Running it against Stripe's production spec (587 endpoints), as of v0.1.0.
+These figures move whenever the rubric changes — rerun the tool for current
+numbers:
 
 ```
 Stripe API (v2026-06-24.dahlia)
-AI-readiness score: 62.9/100
+AI-readiness score: 61.3/100
+Endpoints: 587  Fails: 393  Warnings: 2133
 
+Category scores:
   Description Clarity           68.3/100
   Side Effects                  64.7/100
   Error Responses              100.0/100
@@ -142,6 +147,7 @@ AI-readiness score: 62.9/100
   Ambiguity                     50.0/100
   Parameter Explanation         43.0/100
   Usage Guidelines              51.2/100
+  Tool Surface                  49.6/100
 ```
 
 Two things worth drawing out.
@@ -150,11 +156,11 @@ Two things worth drawing out.
 in this tool, not in Stripe.** Stripe documents errors via OpenAPI's `default`
 response rather than enumerating explicit 4xx/5xx codes. Perfectly valid, and
 arguably cleaner. The check only looked for `4`/`5` prefixes, so it failed all
-587 endpoints. Fixed, regression-tested, and the reason the README says to run
-this against a real spec before trusting it.
+587 endpoints. Fixed, regression-tested, and the reason this README says to run it against a
+real spec before trusting it.
 
 **Stripe is widely and correctly regarded as agent-ready, yet its raw OpenAPI
-spec scores 62.9.** That isn't a contradiction — it's the whole point. Stripe's
+spec scores 61.3.** That isn't a contradiction — it's the whole point. Stripe's
 agent-readiness comes from the *Agent Toolkit* layered on top: curated tool
 definitions, an MCP server, managed OAuth. The raw spec is the input to that
 layer, not the layer itself. Which is exactly why this tool ships with
