@@ -1,0 +1,243 @@
+openapi: 3.0.0
+info:
+  title: Agent-Ready Booking API
+  version: "1.0"
+  description: |
+    The same booking domain as sample_booking_api.yaml, but written so an AI
+    agent can use it reliably. Compare the two audit scores to see what the
+    seven rubric categories actually ask for.
+servers:
+  - url: https://api.example.com/v1
+
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: |
+        Agents must request the narrowest scope that covers their task.
+        Delegated tokens (acting for an end user) additionally carry the
+        `act_on_behalf_of` claim; autonomous agents do not and cannot access
+        write scopes without an explicit grant.
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.example.com/oauth/token
+          scopes:
+            booking:read: Read availability and existing bookings
+            booking:write: Create and cancel bookings
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Stable machine-readable error code, safe to branch on.
+          enum: [invalid_date_range, sold_out, not_found, already_cancelled, rate_limited]
+        message:
+          type: string
+          description: Human-readable explanation.
+        suggested_action:
+          type: string
+          description: What a caller should try next, if anything.
+
+paths:
+  /availability:
+    get:
+      summary: Search bookable availability
+      description: |
+        Returns bookable inventory for a location over a date range, including
+        price and remaining capacity for each item. This is a read-only lookup
+        that does not modify any data and is safe to call speculatively.
+
+        Use this when you need to discover what can be booked before calling
+        POST /bookings. Do not use this to check the status of a booking that
+        already exists — use GET /bookings/{booking_id} for that instead.
+      security:
+        - OAuth2: [booking:read]
+      parameters:
+        - name: date_from
+          in: query
+          required: true
+          description: Inclusive start of the search range, in the venue's local timezone.
+          schema:
+            type: string
+            format: date
+            example: "2026-08-01"
+        - name: date_to
+          in: query
+          required: true
+          description: Exclusive end of the search range. Must be after date_from.
+          schema:
+            type: string
+            format: date
+            example: "2026-08-05"
+        - name: location
+          in: query
+          required: true
+          description: Location code, as returned by GET /locations. Not a free-text city name.
+          schema:
+            type: string
+            example: "STO-01"
+      responses:
+        "200":
+          description: Available items, each with an item_id usable in POST /bookings.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        "400":
+          description: |
+            The request was rejected. Check the `error` field: `invalid_date_range`
+            means date_to was not after date_from.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /bookings:
+    post:
+      summary: Create a booking
+      description: |
+        Creates a new booking for a specific item and customer, and returns the
+        created booking record with its booking_id.
+
+        This endpoint has side effects: it creates a booking and decrements
+        available capacity. It is not safe to call speculatively. Supply an
+        Idempotency-Key header so that a retried call does not create a
+        duplicate booking.
+
+        Use this only after confirming availability via GET /availability. If
+        capacity was taken between the two calls, this returns a `sold_out`
+        error rather than a generic conflict.
+      security:
+        - OAuth2: [booking:write]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: |
+            Client-generated UUID. Repeating a request with the same key returns
+            the original result instead of creating a second booking.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [item_id, customer_id]
+              additionalProperties: false
+              properties:
+                item_id:
+                  type: string
+                  description: An item_id returned by GET /availability.
+                customer_id:
+                  type: string
+                  description: Existing customer identifier. Create the customer first if unknown.
+      responses:
+        "201":
+          description: Booking created. Returns the booking record including booking_id and status.
+          content:
+            application/json:
+              schema:
+                type: object
+        "409":
+          description: |
+            The item could not be booked. `sold_out` means capacity was taken
+            after your availability check — re-run GET /availability for
+            adjacent dates rather than retrying this call unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /bookings/{booking_id}:
+    get:
+      summary: Retrieve one booking by ID
+      description: |
+        Returns the full record for a single existing booking, including its
+        current status, dates, and price. This is a read-only lookup that does
+        not modify data and is safe to call speculatively.
+
+        Use this when you already have a booking_id and need its current state.
+        Do not use this to search for bookable inventory — use GET /availability
+        for that instead.
+      security:
+        - OAuth2: [booking:read]
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          description: Booking identifier returned by POST /bookings.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The booking record, including a status field.
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          description: No booking with this ID exists for the authenticated account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /bookings/{booking_id}/cancel:
+    post:
+      summary: Cancel an existing booking
+      description: |
+        Cancels a booking and releases its capacity back to the available pool,
+        returning the updated booking record with status set to cancelled.
+
+        This endpoint has side effects and is not reversible — a cancelled
+        booking cannot be reinstated, only rebooked. Supply an Idempotency-Key
+        so a retry does not produce a spurious error.
+
+        Use this only when the caller has explicitly confirmed cancellation.
+        Do not call it to test whether a booking is cancellable.
+      security:
+        - OAuth2: [booking:write]
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          description: Booking identifier returned by POST /bookings.
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Client-generated UUID making the cancellation safely retryable.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Booking cancelled. Returns the updated record with status `cancelled`.
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          description: No booking with this ID exists for the authenticated account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: |
+            The booking is already cancelled or already completed. Check the
+            `error` field to distinguish; neither case is retryable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

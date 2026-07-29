@@ -1,0 +1,93 @@
+openapi: 3.0.0
+info:
+  title: Generic Booking Platform API
+  version: "1.0"
+servers:
+  - url: https://api.example.com/v1
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.example.com/oauth/token
+          scopes: {}
+paths:
+  /availability:
+    get:
+      summary: Search availability
+      description: Returns availability for a given date range and location. This is a read-only lookup and does not modify any data.
+      parameters:
+        - name: date_from
+          in: query
+          schema:
+            type: string
+        - name: date_to
+          in: query
+          schema:
+            type: string
+        - name: location
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of available items matching the search criteria, including price and remaining capacity.
+        "400":
+          description: Bad request
+
+  /status:
+    get:
+      summary: Get status
+      description: Get status
+      parameters:
+        - name: id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not found
+
+  /bookings:
+    post:
+      summary: Create booking
+      description: ""
+      parameters:
+        - name: item_id
+          in: query
+          schema:
+            type: string
+        - name: customer_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Created
+        "409":
+          description: Conflict
+
+  /bookings/{booking_id}/cancel:
+    post:
+      summary: Cancel booking
+      description: Cancels an existing booking. This modifies the booking record and frees the capacity. Requires an idempotency key header to safely retry.
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Booking successfully cancelled. Returns the updated booking record with status set to cancelled.
+        "404":
+          description: Booking not found — no matching booking_id exists for this account.
+        "409":
+          description: Booking is already cancelled or already completed and cannot be cancelled again.
