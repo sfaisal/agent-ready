@@ -33,6 +33,28 @@ jobs:
       - name: Test
         run: pytest --cov=agent_ready --cov-report=term-missing
 
+      - name: Verify generated MCP scaffold speaks the protocol
+        run: |
+          # Fail loudly if no usable MCP server class is present — otherwise the
+          # conformance tests skip silently and CI goes green on nothing.
+          # The class moved in mcp 2.0, so accept either generation.
+          python - <<'PY'
+          try:
+              from mcp.server import MCPServer as S
+          except ImportError:
+              from mcp.server.fastmcp import FastMCP as S
+          print("MCP server class available:", S.__name__)
+          PY
+          agent-ready examples/agent_ready_booking_api.yaml --generate-mcp /tmp/server.py --quiet
+          python /tmp/server.py < /dev/null || true
+          # Defence in depth: a skipped conformance suite is a silent pass, which
+          # is the exact failure this step exists to prevent.
+          pytest tests/test_mcp_conformance.py -v -rs | tee /tmp/conformance.log
+          if grep -q "SKIPPED" /tmp/conformance.log; then
+            echo "::error::Conformance tests were skipped, not run — treating as failure."
+            exit 1
+          fi
+
       - name: Smoke-test the CLI
         run: |
           agent-ready examples/sample_booking_api.yaml

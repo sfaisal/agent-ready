@@ -3,14 +3,9 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.1.0] - 2026-07-29
+## [Unreleased]
 
-First release, published to PyPI as `openapi-agent-ready`.
-
-> The distribution name differs from the repo name: PyPI rejected `agent-ready`
-> as too similar to the existing `agentready` package. The import name
-> (`agent_ready`) and CLI command (`agent-ready`) are unaffected.
-
+## [0.1.0] - 2026-07-28
 
 ### Added
 - Seven-category AI-readiness rubric for OpenAPI specs
@@ -42,6 +37,76 @@ First release, published to PyPI as `openapi-agent-ready`.
   away against hundreds of endpoint findings. Stripe's tool-surface score was
   99/100 before this fix and 49.6/100 after.
 
+### Added
+- **MCP conformance test suite** (`tests/test_mcp_conformance.py`). Launches the
+  generated scaffold as a subprocess, completes a real MCP handshake over stdio
+  using the official client, and validates the advertised tool definitions:
+  name format, uniqueness, description presence, `inputSchema` validity as JSON
+  Schema, required-argument correctness, and side-effect disclosure. Previously
+  the only check on generated output was that the file compiled.
+
+### Fixed
+- **Request body fields were silently dropped.** The generator read only
+  `parameters`, so a `POST` endpoint's payload properties never became tool
+  arguments — producing, for example, a create-booking tool with no way to say
+  what to book. Syntactically valid and completely uncallable, which is exactly
+  the class of bug a compile check cannot catch.
+- **No arguments were marked required.** Every parameter was emitted with a
+  `= None` default, so the advertised `inputSchema` had an empty `required`
+  array. A model could call an endpoint with a `{path_param}` and omit it,
+  producing a malformed URL. Path parameters are now always required, and
+  `required: true` from the spec is honoured for query, header, and body fields.
+
+### Fixed
+- **Generated scaffold failed on mcp 2.0.** FastMCP was replaced by `MCPServer`
+  in the 2.x SDK, so `from mcp.server.fastmcp import FastMCP` no longer resolved
+  and every generated server crashed on import. The scaffold now imports through
+  a compatibility shim supporting both generations, verified against mcp 1.28.1
+  and 2.0.0.
+
+### Added
+- Generated tools now carry **`ToolAnnotations`** (`readOnlyHint`,
+  `destructiveHint`, `idempotentHint`, `openWorldHint`) derived from the HTTP
+  method. Prose in a description helps a model reason about side effects;
+  annotations let a client *enforce* — auto-approving reads while requiring
+  confirmation for writes. camelCase field names are used deliberately, as they
+  are accepted by both SDK generations.
+
 ### Changed
-- Distribution name is now `openapi-agent-ready` (PyPI collision with
-  `agentready`). Import name, CLI command, and repo name unchanged.
+- **Generated scaffolds are now self-documenting.** The file header states its
+  dependencies (`pip install mcp httpx`), how to run it, a ready-to-paste Claude
+  Desktop config block, and three things to fix before shipping — notably that
+  the scaffold sends no credentials, so calls against a real API will 401 until
+  auth is wired in. Previously someone receiving a generated file out of context
+  had no way to know what it needed.
+- **Generated servers are named after their source API** (`spotify-web-api`
+  rather than the shared `generated-api-server` placeholder). Two generated
+  servers connected to the same client no longer present identical names.
+- **The `[mcp]` extra is now also available as `[server]`,** which describes it
+  accurately: these are dependencies the *generated* server needs at runtime,
+  not dependencies of the auditor. `[mcp]` is retained as an alias.
+
+### Fixed
+- **Conformance tests silently skipped under mcp 2.0.** The module-level guard
+  probed `mcp.server.fastmcp`, which does not exist in the 2.x SDK, so the entire
+  suite skipped against a current install — a green build that verified nothing.
+  The guard now probes for either server class, and CI fails explicitly if the
+  suite skips rather than runs.
+
+### Fixed
+- **Conformance tests failed against mcp 2.0.** The 2.x SDK renamed result
+  fields from camelCase to snake_case (`serverInfo` -> `server_info`,
+  `inputSchema` -> `input_schema`, `readOnlyHint` -> `read_only_hint`), and the
+  tests were pinned to the 1.x spelling. Assertions now read fields through
+  version-agnostic accessors. The suite is verified against both mcp 1.28.1 and
+  2.0.0.
+- **Failures inside anyio task groups are now readable.** Exception groups are
+  flattened to their leaf causes and `BaseException` is caught rather than
+  `Exception`, so a `BaseExceptionGroup` no longer escapes the diagnostic
+  wrapper and leaves the real error truncated. This is what finally surfaced
+  the rename above.
+
+### Changed
+- Tool listings are fetched once per generated file and cached rather than
+  spawning a server subprocess per test, cutting spawns from ~14 to 4 and
+  running roughly a third faster.
