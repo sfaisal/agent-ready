@@ -73,7 +73,7 @@ agent failures in production.
 
 ```bash
 pip install openapi-agent-ready             # core
-pip install "openapi-agent-ready[mcp]"      # + MCP scaffold generation
+pip install "openapi-agent-ready[server]"      # + MCP scaffold generation
 ```
 
 From source:

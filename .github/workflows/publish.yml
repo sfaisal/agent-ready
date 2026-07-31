@@ -8,12 +8,40 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
+      id-token: write        # required for trusted publishing
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install build
-      - run: python -m build
+
+      # Fail in seconds if the tag and the packaged version disagree, rather
+      # than after pulling a Docker image, signing artifacts, and being
+      # rejected by PyPI. A version number consumed by a failed upload is
+      # gone permanently, so this check is worth its five lines.
+      - name: Check tag matches package version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "tag=$TAG  pyproject=$VERSION"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "::error::Tag v$TAG does not match pyproject.toml version $VERSION. Move the tag to a commit with the correct version, then delete and recreate the release."
+            exit 1
+          fi
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+
+      # Catches a README that won't render on PyPI and other metadata problems.
+      # Unfixable after upload without burning a version number.
+      - name: Check metadata
+        run: twine check dist/*
+
+      - name: Show what will be uploaded
+        run: ls -la dist/
+
       - uses: pypa/gh-action-pypi-publish@release/v1
