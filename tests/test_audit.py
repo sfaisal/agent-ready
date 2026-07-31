@@ -541,3 +541,89 @@ def test_same_name_different_location_is_not_deduplicated():
     }
     ep = extract_endpoints(spec)[0]
     assert len(ep.parameters) == 2, "distinct locations must both survive"
+
+
+def test_version_is_detected_not_hardcoded():
+    """
+    --version printed a hardcoded 0.1.0 from a published 0.2.0 install. The
+    version must come from installed metadata so it cannot drift from
+    pyproject.toml.
+    """
+    import agent_ready
+
+    assert agent_ready.__version__, "version must not be empty"
+    assert agent_ready.__version__ != "0.1.0", (
+        "version looks hardcoded to the original release"
+    )
+
+
+# --------------------------------------------------------------------------
+# Progress reporting and ambiguity-check performance
+# --------------------------------------------------------------------------
+
+def test_progress_callback_is_invoked_and_completes():
+    """Long runs must show activity; the callback must reach 100%."""
+    spec = {
+        "paths": {
+            f"/thing{i}": {
+                "get": {
+                    "summary": f"Get thing {i}",
+                    "description": f"Returns the record for thing {i} by identifier.",
+                    "parameters": [],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+            for i in range(30)
+        }
+    }
+    seen = []
+    run_audit(spec, progress=lambda done, total: seen.append((done, total)))
+    assert seen, "progress callback was never invoked"
+    assert seen[-1][0] == seen[-1][1], "progress did not reach completion"
+
+
+def test_ambiguity_prefilter_does_not_change_results():
+    """
+    The quick_ratio prefilters are documented upper bounds on ratio(), so they
+    must never exclude a pair the full comparison would have flagged.
+
+    Note the sequence argument order matters: SequenceMatcher.ratio() is not
+    symmetric, because the autojunk heuristic applies to the second sequence
+    only. An earlier version of this optimisation swapped the order and
+    silently changed which pairs were reported.
+    """
+    import difflib
+
+    from agent_ready.rubric import check_ambiguity
+
+    spec = {
+        "paths": {
+            "/alpha": {"get": {"summary": "Retrieve a record",
+                               "description": "Returns the details of an existing record by id.",
+                               "parameters": [], "responses": {}}},
+            "/beta": {"get": {"summary": "Retrieve a record",
+                              "description": "Returns the details of an existing record by ID.",
+                              "parameters": [], "responses": {}}},
+            "/gamma": {"get": {"summary": "Create invoice",
+                               "description": "Generates a new invoice for the given customer account.",
+                               "parameters": [], "responses": {}}},
+        }
+    }
+    endpoints = extract_endpoints(spec)
+
+    expected = set()
+    for i in range(len(endpoints)):
+        for j in range(i + 1, len(endpoints)):
+            a, b = endpoints[i], endpoints[j]
+            ratio = difflib.SequenceMatcher(
+                None, a.full_text.lower(), b.full_text.lower()
+            ).ratio()
+            if ratio > 0.7:
+                expected.add(f"{a.id} vs {b.id}")
+
+    actual = {
+        f.endpoint
+        for f in check_ambiguity(endpoints, max_reported=10**6)
+        if f.severity == "warning" and f.endpoint != "(summary)"
+    }
+    assert actual == expected, f"prefilter changed results: {actual ^ expected}"
