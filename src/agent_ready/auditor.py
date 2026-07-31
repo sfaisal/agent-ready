@@ -98,6 +98,18 @@ def extract_endpoints(spec: dict) -> list[EndpointInfo]:
                 elif isinstance(p, dict):
                     resolved.append(p)
 
+            # Deduplicate. OpenAPI defines a parameter's identity as the
+            # combination of `name` and `in`, and an operation-level parameter
+            # overrides a path-level one with the same identity. Real specs
+            # routinely declare both — Asana's declares `project_gid` at each
+            # level — and concatenating them produced generated functions with
+            # duplicate argument names, which are a Python SyntaxError.
+            deduped = {}
+            for p in resolved:
+                key = (p.get("name"), p.get("in", "query"))
+                deduped[key] = p  # later entries (operation-level) win
+            resolved = list(deduped.values())
+
             endpoints.append(
                 EndpointInfo(
                     path=path,
