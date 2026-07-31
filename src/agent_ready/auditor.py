@@ -124,8 +124,14 @@ def extract_endpoints(spec: dict) -> list[EndpointInfo]:
     return endpoints
 
 
-def run_audit(spec: dict) -> dict:
-    """Run every rubric check and aggregate into a scored result."""
+def run_audit(spec: dict, progress=None) -> dict:
+    """
+    Run every rubric check and aggregate into a scored result.
+
+    `progress` is an optional callable receiving (completed, total) for the
+    ambiguity check, which dominates runtime on large specs and would otherwise
+    look like the tool had hung.
+    """
     endpoints = extract_endpoints(spec)
     security_schemes = (spec.get("components") or {}).get("securitySchemes") or {}
 
@@ -138,7 +144,7 @@ def run_audit(spec: dict) -> dict:
         findings += check_parameter_explanation(ep)
         findings += check_usage_guidelines(ep)
         findings += check_schema_strictness(ep)
-    findings += check_ambiguity(endpoints)
+    findings += check_ambiguity(endpoints, progress=progress)
     findings += check_tool_surface(endpoints)
 
     # Score per category. Spec-level findings (e.g. "this catalogue has 587

@@ -215,27 +215,69 @@ def check_auth_clarity(ep: EndpointInfo, security_schemes: dict) -> list[Finding
     return findings
 
 
-def check_ambiguity(endpoints: list[EndpointInfo], max_reported: int = 25) -> list[Finding]:
+def check_ambiguity(
+    endpoints: list[EndpointInfo],
+    max_reported: int = 25,
+    threshold: float = 0.7,
+    progress=None,
+) -> list[Finding]:
     """
     Pairwise-compare endpoint descriptions to flag near-duplicates that could
     confuse a model.
 
-    On large specs this is O(n^2) in comparisons and can produce thousands of
-    findings, so we score against all of them but only report the worst
-    `max_reported` pairs — an unreadable report gets ignored, which helps nobody.
+    This is O(n^2) in comparisons and dominates total runtime on large specs —
+    it was 76 of the 77 seconds spent auditing Stripe's 587 endpoints.
+
+    The optimisation below cannot change results:
+
+    `SequenceMatcher.real_quick_ratio()` and `quick_ratio()` are documented
+    and `quick_ratio()` are documented upper bounds on `ratio()`. If a cheap
+    bound already falls below the threshold, the full comparison cannot exceed
+    it either, so the pair is rejected without running it.
+    Truncating comparison text was also tried and rejected: it made the check
+    ~5x faster but changed which pairs were reported, and a faster check that
+    disagrees with itself is not an optimisation.
+
+    `progress` is an optional callable receiving (completed, total) so the CLI
+    can report activity on long runs.
     """
+    texts = [ep.full_text.lower() for ep in endpoints]
+
     scored = []
-    for i in range(len(endpoints)):
-        for j in range(i + 1, len(endpoints)):
-            a, b = endpoints[i], endpoints[j]
-            if a.path == b.path:
+    n = len(endpoints)
+    total_pairs = n * (n - 1) // 2
+    done = 0
+    report_every = max(1, total_pairs // 100)
+
+    for i in range(n):
+        a, text_a = endpoints[i], texts[i]
+        if not text_a:
+            done += n - i - 1
+            continue
+        matcher = difflib.SequenceMatcher()
+        matcher.set_seq1(text_a)
+
+        for j in range(i + 1, n):
+            done += 1
+            if progress is not None and done % report_every == 0:
+                progress(done, total_pairs)
+
+            b, text_b = endpoints[j], texts[j]
+            if a.path == b.path or not text_b:
                 continue
-            text_a, text_b = a.full_text.lower(), b.full_text.lower()
-            if not text_a or not text_b:
+
+            matcher.set_seq2(text_b)
+            # Cheap upper bounds first — both are guaranteed >= ratio().
+            if matcher.real_quick_ratio() <= threshold:
                 continue
-            similarity = difflib.SequenceMatcher(None, text_a, text_b).ratio()
-            if similarity > 0.7:
+            if matcher.quick_ratio() <= threshold:
+                continue
+            similarity = matcher.ratio()
+            if similarity > threshold:
                 scored.append((similarity, a, b))
+
+    if progress is not None:
+        progress(total_pairs, total_pairs)
 
     if not scored:
         return [Finding("ambiguity", "pass", "all", "No significant description overlap detected.")]

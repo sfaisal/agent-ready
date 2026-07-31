@@ -74,6 +74,36 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+
+def _make_progress(endpoint_count: int, quiet: bool):
+    """
+    Report progress on stderr for the ambiguity check.
+
+    Only shown when the run is large enough to be worth waiting for and stderr
+    is a terminal — piping to a file or another command should not accumulate
+    carriage returns. Progress goes to stderr so `--format json` stdout stays
+    machine-readable.
+    """
+    if quiet or endpoint_count < 150 or not sys.stderr.isatty():
+        return None
+
+    def report(done: int, total: int):
+        pct = 100 * done / total if total else 100
+        bar_width = 24
+        filled = int(bar_width * pct / 100)
+        bar = "#" * filled + "-" * (bar_width - filled)
+        end = "\n" if done >= total else ""
+        print(
+            f"\r  comparing {endpoint_count} endpoints for ambiguity "
+            f"[{bar}] {pct:3.0f}%{end}",
+            end=end or "",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    return report
+
+
 def _text_summary(spec: dict, result: dict) -> str:
     info = spec.get("info") or {}
     lines = [
@@ -124,7 +154,8 @@ def _run(argv=None) -> int:
         )
         return EXIT_SPEC_ERROR
 
-    result = run_audit(spec)
+    endpoint_count = len(spec.get("paths") or {})
+    result = run_audit(spec, progress=_make_progress(endpoint_count, args.quiet))
 
     if result["endpoint_count"] == 0:
         print("error: spec contains no operations to audit.", file=sys.stderr)

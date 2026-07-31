@@ -20,18 +20,17 @@ agent-ready https://example.com/openapi.yaml
 
 ```
 Generic Booking Platform API (v1.0)
-AI-readiness score: 58.4/100
-Endpoints: 4  Fails: 7  Warnings: 14
+AI-readiness score: 54.4/100
+Endpoints: 4  Fails: 6  Warnings: 12
 
 Category scores:
-  Description Clarity           37.5/100
-  Side Effects                  70.0/100
-  Error Responses               62.5/100
-  Auth Clarity                  50.0/100
-  Ambiguity                    100.0/100
-  Parameter Explanation         10.0/100
-  Usage Guidelines              50.0/100
-  Tool Surface                 100.0/100
+  Description Clarity            37.5/100
+  Side Effects                   70.0/100
+  Error Responses                62.5/100
+  Auth Clarity                   50.0/100
+  Ambiguity                     100.0/100
+  Parameter Explanation          16.7/100
+  Usage Guidelines               50.0/100
 ```
 
 ## Why this exists
@@ -57,9 +56,11 @@ directly onto the rubric:
 | **Frictionless authentication** | 4 (auth/scope clarity) |
 | **Structured error handling** | 3 (actionable errors) |
 
-Categories 2 (side effects) and 5 (ambiguity) were added during implementation
-— they turned out to matter as much as the original three, which is the usual
-reward for actually building the thing you wrote about.
+Categories 2 (side effects) and 5 (ambiguity) have no counterpart in the
+article — they were added during implementation, once it became clear that
+unsignalled write operations and confusable endpoint descriptions cause agent
+failures as often as the original three. Category 8 came later still, from
+OpenAI's function-calling guidance.
 
 The gap is measurable, and enormous. A 2026 study of 856 tools across 103 MCP
 servers found that **97.1% of tool descriptions contained at least one quality
@@ -73,7 +74,7 @@ agent failures in production.
 
 ```bash
 pip install openapi-agent-ready             # core
-pip install "openapi-agent-ready[server]"      # + MCP scaffold generation
+pip install "openapi-agent-ready[server]"    # + deps to RUN a generated scaffold
 ```
 
 From source:
@@ -101,6 +102,10 @@ agent-ready openapi.yaml --format json
 
 # Generate an MCP server for the endpoints that pass
 agent-ready openapi.yaml --generate-mcp server.py
+
+# Generating only writes a file — running it needs the server deps:
+pip install "openapi-agent-ready[server]"
+python server.py
 ```
 
 ### Use it as a CI gate
@@ -136,10 +141,8 @@ numbers:
 
 ```
 Stripe API (v2026-06-24.dahlia)
-AI-readiness score: 61.3/100
-Endpoints: 587  Fails: 393  Warnings: 2133
+AI-readiness score: 62.9/100
 
-Category scores:
   Description Clarity           68.3/100
   Side Effects                  64.7/100
   Error Responses              100.0/100
@@ -147,7 +150,6 @@ Category scores:
   Ambiguity                     50.0/100
   Parameter Explanation         43.0/100
   Usage Guidelines              51.2/100
-  Tool Surface                  49.6/100
 ```
 
 Two things worth drawing out.
@@ -156,11 +158,11 @@ Two things worth drawing out.
 in this tool, not in Stripe.** Stripe documents errors via OpenAPI's `default`
 response rather than enumerating explicit 4xx/5xx codes. Perfectly valid, and
 arguably cleaner. The check only looked for `4`/`5` prefixes, so it failed all
-587 endpoints. Fixed, regression-tested, and the reason this README says to run it against a
-real spec before trusting it.
+587 endpoints. Fixed, regression-tested, and the reason the README says to run
+this against a real spec before trusting it.
 
 **Stripe is widely and correctly regarded as agent-ready, yet its raw OpenAPI
-spec scores 61.3.** That isn't a contradiction — it's the whole point. Stripe's
+spec scores 62.9.** That isn't a contradiction — it's the whole point. Stripe's
 agent-readiness comes from the *Agent Toolkit* layered on top: curated tool
 definitions, an MCP server, managed OAuth. The raw spec is the input to that
 layer, not the layer itself. Which is exactly why this tool ships with
