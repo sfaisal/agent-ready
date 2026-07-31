@@ -482,3 +482,62 @@ def test_cli_json_output_is_valid(tmp_path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert "overall_score" in payload
     assert payload["api"]["title"] == "Good API"
+
+
+# --------------------------------------------------------------------------
+# Regression: duplicate parameters (found by auditing Asana's public spec)
+# --------------------------------------------------------------------------
+
+def test_path_and_operation_parameters_are_deduplicated():
+    """
+    OpenAPI identifies a parameter by name + location, and an operation-level
+    declaration overrides a path-level one. Asana's spec declares `project_gid`
+    at both levels; concatenating them produced a generated function with two
+    identically-named arguments, which is a Python SyntaxError.
+    """
+    spec = {
+        "paths": {
+            "/projects/{project_gid}/statuses": {
+                "parameters": [
+                    {"name": "project_gid", "in": "path", "description": "path-level"},
+                    {"name": "opt_fields", "in": "query", "description": "path-level"},
+                ],
+                "get": {
+                    "summary": "List statuses",
+                    "description": "Returns statuses for a project.",
+                    "parameters": [
+                        {"name": "project_gid", "in": "path", "description": "operation-level"},
+                        {"name": "opt_fields", "in": "query", "description": "operation-level"},
+                    ],
+                    "responses": {},
+                },
+            }
+        }
+    }
+    ep = extract_endpoints(spec)[0]
+    names = [p["name"] for p in ep.parameters]
+    assert len(names) == len(set(names)), f"duplicate parameters survived: {names}"
+    # Operation-level wins, per the OpenAPI specification.
+    by_name = {p["name"]: p for p in ep.parameters}
+    assert by_name["project_gid"]["description"] == "operation-level"
+
+
+def test_same_name_different_location_is_not_deduplicated():
+    """A path `id` and a query `id` are genuinely distinct parameters."""
+    spec = {
+        "paths": {
+            "/things/{id}": {
+                "get": {
+                    "summary": "Get thing",
+                    "description": "Returns a thing.",
+                    "parameters": [
+                        {"name": "id", "in": "path", "description": "the path id"},
+                        {"name": "id", "in": "query", "description": "a filter id"},
+                    ],
+                    "responses": {},
+                }
+            }
+        }
+    }
+    ep = extract_endpoints(spec)[0]
+    assert len(ep.parameters) == 2, "distinct locations must both survive"

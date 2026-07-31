@@ -13,6 +13,7 @@ import json
 import sys
 from pathlib import Path
 
+from . import __version__
 from .auditor import (
     SpecLoadError,
     endpoints_ready_for_mcp,
@@ -67,7 +68,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate an MCP server scaffold for the endpoints that pass",
     )
     parser.add_argument("--quiet", action="store_true", help="Suppress non-essential output")
-    parser.add_argument("--version", action="version", version="%(prog)s 0.1.0")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
     return parser
 
 
