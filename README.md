@@ -9,7 +9,7 @@
 **Audit any OpenAPI spec for AI-agent readiness — then generate an MCP server scaffold for the endpoints that pass.**
 
 Your API works fine for human developers. That doesn't mean an AI agent can use
-it reliably. `agent-ready` scores a spec against seven categories of
+it reliably. `agent-ready` scores a spec against eight categories of
 agent-specific failure, tells you exactly which endpoints will cause trouble and
 why, and can gate a CI pipeline so specs don't regress.
 
