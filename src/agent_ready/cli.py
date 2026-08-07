@@ -21,6 +21,12 @@ from .auditor import (
     result_to_dict,
     run_audit,
 )
+from .baseline import (
+    BaselineError,
+    compare_to_baseline,
+    load_baseline,
+    write_baseline,
+)
 from .mcp_generator import generate_mcp_scaffold
 from .report_generator import generate_report
 
@@ -38,7 +44,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog=(
             "CI example:\n"
-            "  agent-ready openapi.yaml --min-score 70 --max-fails 0 --quiet\n"
+            "  agent-ready openapi.yaml --min-score 60 --max-fails 0 --quiet\n"
+            "\n"
+            "Adopting on an existing API, where fixing everything first is not\n"
+            "realistic — record today's findings, then block only regressions:\n"
+            "  agent-ready openapi.yaml --write-baseline .agent-ready-baseline.json\n"
+            "  agent-ready openapi.yaml --baseline .agent-ready-baseline.json --max-new 0\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -59,6 +70,31 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-fails",
         type=int,
         help="Exit 1 if the number of FAIL findings exceeds this value (CI gate)",
+    )
+    parser.add_argument(
+        "--write-baseline",
+        metavar="PATH",
+        help=(
+            "Record current findings to PATH as an accepted baseline. Run this "
+            "once when adopting the tool on an existing API."
+        ),
+    )
+    parser.add_argument(
+        "--baseline",
+        metavar="PATH",
+        help=(
+            "Compare against a baseline file and report what changed. Combine "
+            "with --max-new to fail only on regressions."
+        ),
+    )
+    parser.add_argument(
+        "--max-new",
+        type=int,
+        metavar="N",
+        help=(
+            "Exit 1 if more than N findings are new since --baseline. "
+            "Use --max-new 0 to block any regression."
+        ),
     )
     parser.add_argument(
         "--generate-mcp",
@@ -185,6 +221,37 @@ def _run(argv=None) -> int:
                 f"({len(ready)}/{result['endpoint_count']} endpoints included)"
             )
 
+    # Baseline: write, or compare and gate on regressions only.
+    if args.write_baseline:
+        write_baseline(args.write_baseline, spec, result)
+        if not args.quiet:
+            print(
+                f"Baseline written to {args.write_baseline} "
+                f"({len(result['gaps'])} finding(s) recorded as accepted)"
+            )
+
+    comparison = None
+    if args.baseline:
+        try:
+            comparison = compare_to_baseline(result, load_baseline(args.baseline))
+        except BaselineError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return EXIT_SPEC_ERROR
+
+        if not args.quiet:
+            print()
+            print(
+                f"Compared against {args.baseline}: "
+                f"{comparison['new_count']} new, "
+                f"{comparison['fixed_count']} fixed, "
+                f"{comparison['unchanged_count']} unchanged"
+            )
+            for f in comparison["new_findings"][:20]:
+                marker = "FAIL" if f.severity == "fail" else "WARN"
+                print(f"  NEW {marker}  {f.endpoint} — {f.message}")
+            if len(comparison["new_findings"]) > 20:
+                print(f"  ... and {len(comparison['new_findings']) - 20} more")
+
     # CI gates
     gate_failed = False
     if args.min_score is not None and result["overall_score"] < args.min_score:
@@ -198,6 +265,18 @@ def _run(argv=None) -> int:
         print(
             f"GATE FAILED: {result['fail_count']} FAIL finding(s) exceeds "
             f"maximum {args.max_fails}",
+            file=sys.stderr,
+        )
+        gate_failed = True
+
+    if (
+        comparison is not None
+        and args.max_new is not None
+        and comparison["new_count"] > args.max_new
+    ):
+        print(
+            f"GATE FAILED: {comparison['new_count']} new finding(s) since "
+            f"baseline exceeds maximum {args.max_new}",
             file=sys.stderr,
         )
         gate_failed = True

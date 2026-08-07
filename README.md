@@ -9,7 +9,7 @@
 **Audit any OpenAPI spec for AI-agent readiness — then generate an MCP server scaffold for the endpoints that pass.**
 
 Your API works fine for human developers. That doesn't mean an AI agent can use
-it reliably. `agent-ready` scores a spec against eight categories of
+it reliably. `agent-ready` scores a spec against seven categories of
 agent-specific failure, tells you exactly which endpoints will cause trouble and
 why, and can gate a CI pipeline so specs don't regress.
 
@@ -56,11 +56,9 @@ directly onto the rubric:
 | **Frictionless authentication** | 4 (auth/scope clarity) |
 | **Structured error handling** | 3 (actionable errors) |
 
-Categories 2 (side effects) and 5 (ambiguity) have no counterpart in the
-article — they were added during implementation, once it became clear that
-unsignalled write operations and confusable endpoint descriptions cause agent
-failures as often as the original three. Category 8 came later still, from
-OpenAI's function-calling guidance.
+Categories 2 (side effects) and 5 (ambiguity) were added during implementation
+— they turned out to matter as much as the original three, which is the usual
+reward for actually building the thing you wrote about.
 
 The gap is measurable, and enormous. A 2026 study of 856 tools across 103 MCP
 servers found that **97.1% of tool descriptions contained at least one quality
@@ -130,8 +128,41 @@ Exit codes:
 | Code | Meaning |
 |---|---|
 | `0` | All configured gates passed |
-| `1` | A gate failed (`--min-score` / `--max-fails`) |
+| `1` | A gate failed (`--min-score` / `--max-fails` / `--max-new`) |
 | `2` | The spec could not be loaded or parsed |
+
+### Adopting on an existing API
+
+A mature API audited for the first time will produce hundreds of findings. No
+team can fix all of them before merging anything, so a score gate is unusable
+on day one and gets switched off within a week.
+
+Record the current state instead, and block only what gets worse:
+
+```bash
+# once, when you adopt the tool — commit this file
+agent-ready openapi.yaml --write-baseline .agent-ready-baseline.json
+
+# in CI, from then on
+agent-ready openapi.yaml --baseline .agent-ready-baseline.json --max-new 0
+```
+
+Existing findings stay visible in the report but don't fail the build. A pull
+request that introduces a new one does, and the output names exactly which
+findings it added:
+
+```
+Compared against .agent-ready-baseline.json: 5 new, 0 fixed, 11 unchanged
+  NEW FAIL  GET /invoices — Description is a bare label (12 chars) ...
+  NEW FAIL  GET /invoices — No error responses documented ...
+```
+
+Findings are matched on category, endpoint, and severity — not on message text,
+which contains counts and parameter names that shift when unrelated things
+change. A warning escalating to a fail counts as new; rewording a finding in a
+future release does not invalidate your baseline.
+
+As the team fixes the backlog, regenerate the baseline to lock in the progress.
 
 ## Real-world results
 
