@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-08
+
+### Added
+- **Baseline mode** (`--write-baseline`, `--baseline`, `--max-new`). A mature
+  API audited for the first time produces hundreds of findings, so a score gate
+  is unusable on day one and gets switched off. Recording the current state lets
+  CI block only regressions while the backlog stays visible.
+
+  Findings are matched on category, endpoint, and severity rather than message
+  text — messages embed counts and parameter names ("3/3 parameters have no
+  description (a, b, c)") that shift when unrelated things change, which would
+  report unfixed problems as new. Severity is part of the identity so a warning
+  escalating to a fail is caught; message is excluded so rewording a finding in
+  a future release doesn't invalidate stored baselines.
+
 ## [0.3.0] - 2026-07-31
 
 ### Added
