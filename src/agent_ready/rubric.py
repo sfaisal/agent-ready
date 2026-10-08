@@ -1,7 +1,7 @@
 """
 AI-Readiness Rubric
 -------------------
-Seven categories used to score how ready an API (from an OpenAPI spec) is
+Eight categories used to score how ready an API (from an OpenAPI spec) is
 for reliable use by AI agents / MCP servers. Each endpoint gets checked
 against every category; failures become concrete, cite-able gaps.
 
@@ -13,8 +13,9 @@ Categories:
 5. Ambiguity between endpoints      -- Wang et al. (2026) found 73% repeated tool names
 6. Parameter explanation            -- "Opaque Parameters" smell: 84.3% prevalence
 7. Usage guidelines (when to call)  -- "Missing Usage Guidelines" smell: 89.3% prevalence
+8. Tool surface & schema strictness -- OpenAI function-calling guidance (keep tool count small)
 
-Provenance note (be honest about this in interviews):
+Provenance:
 Categories 1-5 were derived independently from how MCP tool selection works
 plus standard API design principles. Categories 6-7 were added after checking
 the rubric against published empirical work:
@@ -29,7 +30,7 @@ the rubric against published empirical work:
     Server Descriptions," arXiv:2602.18914. 10,831 servers, 18 smell
     categories across accuracy / functionality / completeness / conciseness.
 
-IMPORTANT TRADE-OFF (cite this, it's the senior-level point):
+IMPORTANT TRADE-OFF:
 Hasan et al. found that augmenting ALL description components improved task
 success by a median 5.85pp but increased execution steps by 67.46% and
 REGRESSED performance in 16.67% of cases. More completeness is not strictly
