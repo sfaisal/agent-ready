@@ -9,7 +9,7 @@
 **Audit any OpenAPI spec for AI-agent readiness — then generate an MCP server scaffold for the endpoints that pass.**
 
 Your API works fine for human developers. That doesn't mean an AI agent can use
-it reliably. `agent-ready` scores a spec against seven categories of
+it reliably. `agent-ready` scores a spec against eight categories of
 agent-specific failure, tells you exactly which endpoints will cause trouble and
 why, and can gate a CI pipeline so specs don't regress.
 
@@ -20,17 +20,18 @@ agent-ready https://example.com/openapi.yaml
 
 ```
 Generic Booking Platform API (v1.0)
-AI-readiness score: 54.4/100
-Endpoints: 4  Fails: 6  Warnings: 12
+AI-readiness score: 58.4/100
+Endpoints: 4  Fails: 7  Warnings: 14
 
 Category scores:
-  Description Clarity            37.5/100
-  Side Effects                   70.0/100
-  Error Responses                62.5/100
-  Auth Clarity                   50.0/100
-  Ambiguity                     100.0/100
-  Parameter Explanation          16.7/100
-  Usage Guidelines               50.0/100
+  Description Clarity           37.5/100
+  Side Effects                  70.0/100
+  Error Responses               62.5/100
+  Auth Clarity                  50.0/100
+  Ambiguity                    100.0/100
+  Parameter Explanation         10.0/100
+  Usage Guidelines              50.0/100
+  Tool Surface                 100.0/100
 ```
 
 ## Why this exists
@@ -281,7 +282,7 @@ doesn't:
 
 - **The ambiguity check uses string similarity**, so it misses endpoints that
   are semantically similar but differently worded. Embedding-based similarity
-  would be stronger. ([#1](https://github.com/sfaisal/agent-ready/issues))
+  would be stronger. ([#1](https://github.com/sfaisal/agent-ready/issues/1))
 - **Category weights are judgement calls, not measured effect sizes.**
   Description clarity is weighted highest on the prior that wrong tool selection
   is the costliest failure — that prior is untested here.
@@ -304,7 +305,7 @@ doesn't:
 - [ ] LLM-assisted rewriting of flagged descriptions (`--fix`)
 - [ ] Live tool-selection testing against a generated MCP server
 - [ ] GitHub Action wrapper
-- [ ] Baseline mode (`--baseline`) so CI only fails on *new* regressions
+- [x] Baseline mode (`--baseline`) so CI only fails on *new* regressions
 
 ## Contributing
 
