@@ -282,7 +282,7 @@ doesn't:
 
 - **The ambiguity check uses string similarity**, so it misses endpoints that
   are semantically similar but differently worded. Embedding-based similarity
-  would be stronger. ([#1](https://github.com/sfaisal/agent-ready/issues))
+  would be stronger. ([#1](https://github.com/sfaisal/agent-ready/issues/1))
 - **Category weights are judgement calls, not measured effect sizes.**
   Description clarity is weighted highest on the prior that wrong tool selection
   is the costliest failure — that prior is untested here.
