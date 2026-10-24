@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-24
+
 ### Fixed
 - **Swagger 2.0 specs are now rejected (exit 2)** instead of being audited.
   They have `paths`, so they were scored, but auth lives in
