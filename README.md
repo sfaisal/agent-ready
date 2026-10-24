@@ -56,9 +56,8 @@ directly onto the rubric:
 | **Frictionless authentication** | 4 (auth/scope clarity) |
 | **Structured error handling** | 3 (actionable errors) |
 
-Categories 2 (side effects) and 5 (ambiguity) were added during implementation
-— they turned out to matter as much as the original three, which is the usual
-reward for actually building the thing you wrote about.
+Categories 2 (side effects) and 5 (ambiguity) weren't in the article. They came
+up once I started building, and they matter as much as the original three.
 
 The gap is measurable, and enormous. A 2026 study of 856 tools across 103 MCP
 servers found that **97.1% of tool descriptions contained at least one quality
@@ -164,6 +163,19 @@ future release does not invalidate your baseline.
 
 As the team fixes the backlog, regenerate the baseline to lock in the progress.
 
+### Python API
+
+```python
+from agent_ready import load_spec, run_audit
+
+spec = load_spec("openapi.yaml")
+result = run_audit(spec)
+
+print(result["overall_score"])
+for finding in result["gaps"]:
+    print(finding.severity, finding.endpoint, finding.message)
+```
+
 ## Real-world results
 
 Running it against Stripe's production spec (587 endpoints), as of v0.1.0.
@@ -189,8 +201,8 @@ Two things worth drawing out.
 in this tool, not in Stripe.** Stripe documents errors via OpenAPI's `default`
 response rather than enumerating explicit 4xx/5xx codes. Perfectly valid, and
 arguably cleaner. The check only looked for `4`/`5` prefixes, so it failed all
-587 endpoints. Fixed, regression-tested, and the reason the README says to run
-this against a real spec before trusting it.
+587 endpoints. Fixed and regression-tested — and a good reason to run this
+against your own real spec before trusting the score.
 
 **Stripe is widely and correctly regarded as agent-ready, yet its raw OpenAPI
 spec scores 62.9.** That isn't a contradiction — it's the whole point. Stripe's
@@ -204,19 +216,6 @@ Genuine findings that survived scrutiny: `GET /v1/account` and
 `GET /v1/accounts/{account}` have **100% identical descriptions**, and the spec
 uses bearer/basic API keys rather than scoped OAuth2, so there's no way to
 express "this agent may only read."
-
-### Python API
-
-```python
-from agent_ready import load_spec, run_audit
-
-spec = load_spec("openapi.yaml")
-result = run_audit(spec)
-
-print(result["overall_score"])
-for finding in result["gaps"]:
-    print(finding.severity, finding.endpoint, finding.message)
-```
 
 ## The eight categories
 

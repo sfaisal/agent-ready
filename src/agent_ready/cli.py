@@ -3,8 +3,8 @@ Command-line interface for agent-ready.
 
 Exit codes (designed for CI use):
     0  audit passed all configured gates
-    1  audit ran, but a gate failed (score below --min-score, or
-       --max-fails exceeded)
+    1  audit ran, but a gate failed (score below --min-score,
+       --max-fails exceeded, or --max-new exceeded against --baseline)
     2  the spec could not be loaded or parsed
 """
 
@@ -17,6 +17,7 @@ from . import __version__
 from .auditor import (
     SpecLoadError,
     endpoints_ready_for_mcp,
+    extract_endpoints,
     load_spec,
     result_to_dict,
     run_audit,
@@ -183,6 +184,16 @@ def _run(argv=None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_SPEC_ERROR
 
+    # Swagger 2.0 has `paths` too, but keeps auth in `securityDefinitions` and
+    # bodies in `in: body` params, so auditing it yields confidently wrong scores.
+    if isinstance(spec, dict) and "swagger" in spec:
+        print(
+            f"error: Swagger {spec['swagger']} is not supported — only OpenAPI 3.x. "
+            "Convert it first (e.g. with swagger2openapi).",
+            file=sys.stderr,
+        )
+        return EXIT_SPEC_ERROR
+
     if not isinstance(spec, dict) or not spec.get("paths"):
         print(
             "error: no 'paths' found — this does not look like an OpenAPI spec.",
@@ -190,7 +201,8 @@ def _run(argv=None) -> int:
         )
         return EXIT_SPEC_ERROR
 
-    endpoint_count = len(spec.get("paths") or {})
+    # Operations, not paths — the audit (and the ambiguity check) is per operation.
+    endpoint_count = len(extract_endpoints(spec))
     result = run_audit(spec, progress=_make_progress(endpoint_count, args.quiet))
 
     if result["endpoint_count"] == 0:
