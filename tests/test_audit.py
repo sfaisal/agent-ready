@@ -477,6 +477,13 @@ def test_cli_bad_spec_exits_two(tmp_path, capsys):
     assert main([str(p), "--quiet"]) == 2
 
 
+def test_cli_rejects_swagger_2(tmp_path, capsys):
+    """Swagger 2.0 has `paths`, so it used to be scored (wrongly) instead of rejected."""
+    spec = {"swagger": "2.0", "info": {"title": "Old", "version": "1"}, **GOOD_SPEC}
+    assert main([_write(tmp_path, spec), "--quiet"]) == 2
+    assert "Swagger 2.0 is not supported" in capsys.readouterr().err
+
+
 def test_cli_json_output_is_valid(tmp_path, capsys):
     main([_write(tmp_path, GOOD_SPEC), "--format", "json"])
     payload = json.loads(capsys.readouterr().out)

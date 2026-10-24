@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Swagger 2.0 specs are now rejected (exit 2)** instead of being audited.
+  They have `paths`, so they were scored, but auth lives in
+  `securityDefinitions`, so a spec with scoped OAuth2 was reported as having no
+  security schemes at all.
+- **Progress bar counts operations, not paths.** A spec with 100 paths × 3
+  methods (300 operations) previously never showed progress.
+
 ## [0.4.0] - 2026-08-08
 
 ### Added
