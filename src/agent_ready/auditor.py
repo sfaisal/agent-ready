@@ -24,6 +24,7 @@ from .rubric import (
     check_tool_surface,
     check_usage_guidelines,
 )
+from .swagger import is_swagger2, to_openapi3
 
 SEVERITY_VALUE = {"pass": 1.0, "warning": 0.5, "fail": 0.0}
 
@@ -50,10 +51,14 @@ def load_spec(source: str, timeout: int = 30) -> dict:
     # a clearer error on malformed JSON.
     try:
         if source.endswith(".json") or raw.lstrip().startswith("{"):
-            return json.loads(raw)
-        return yaml.safe_load(raw)
+            spec = json.loads(raw)
+        else:
+            spec = yaml.safe_load(raw)
     except Exception as exc:
         raise SpecLoadError(f"Could not parse spec as JSON or YAML: {exc}") from exc
+
+    # Translate Swagger 2.0 up front so the rubric only ever sees OpenAPI 3.
+    return to_openapi3(spec) if is_swagger2(spec) else spec
 
 
 def _resolve_ref(spec: dict, ref: str):

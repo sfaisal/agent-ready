@@ -477,11 +477,67 @@ def test_cli_bad_spec_exits_two(tmp_path, capsys):
     assert main([str(p), "--quiet"]) == 2
 
 
-def test_cli_rejects_swagger_2(tmp_path, capsys):
-    """Swagger 2.0 has `paths`, so it used to be scored (wrongly) instead of rejected."""
-    spec = {"swagger": "2.0", "info": {"title": "Old", "version": "1"}, **GOOD_SPEC}
-    assert main([_write(tmp_path, spec), "--quiet"]) == 2
-    assert "Swagger 2.0 is not supported" in capsys.readouterr().err
+SWAGGER_SPEC = {
+    "swagger": "2.0",
+    "info": {"title": "Old", "version": "1"},
+    "host": "api.example.com", "basePath": "/v1", "schemes": ["https"],
+    "consumes": ["application/json"], "produces": ["application/json"],
+    "securityDefinitions": {
+        "oauth": {"type": "oauth2", "flow": "accessCode",
+                  "authorizationUrl": "https://a", "tokenUrl": "https://t",
+                  "scopes": {"read": "Read things"}},
+        "basic": {"type": "basic"},
+    },
+    "definitions": {"Pet": {"type": "object", "properties": {"name": {"type": "string"}}}},
+    "paths": {
+        "/pets/{id}": {
+            "parameters": [{"name": "id", "in": "path", "required": True, "type": "string"}],
+            "put": {
+                "parameters": [{"name": "body", "in": "body", "required": True,
+                                "schema": {"$ref": "#/definitions/Pet"}}],
+                "responses": {"200": {"description": "ok", "schema": {"$ref": "#/definitions/Pet"}}},
+            },
+            "post": {
+                "consumes": ["multipart/form-data"],
+                "parameters": [{"name": "photo", "in": "formData", "type": "file", "required": True}],
+                "responses": {"204": {"description": "uploaded"}},
+            },
+        }
+    },
+}
+
+
+def test_swagger_2_is_translated_to_openapi_3(tmp_path):
+    """The rubric reads OpenAPI 3 fields only, so Swagger 2.0 is translated on load."""
+    spec = load_spec(_write(tmp_path, SWAGGER_SPEC))
+    assert "swagger" not in spec and spec["openapi"].startswith("3")
+    assert spec["servers"] == [{"url": "https://api.example.com/v1"}]
+
+    schemes = spec["components"]["securitySchemes"]
+    assert schemes["basic"] == {"type": "http", "scheme": "basic"}
+    assert schemes["oauth"]["flows"]["authorizationCode"]["scopes"] == {"read": "Read things"}
+    assert "Pet" in spec["components"]["schemas"]
+
+    put = spec["paths"]["/pets/{id}"]["put"]
+    assert put["parameters"][0]["schema"] == {"type": "string"}
+    assert put["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/Pet"}
+    assert put["responses"]["200"]["content"]["application/json"]["schema"]["$ref"] == (
+        "#/components/schemas/Pet")
+
+    post = spec["paths"]["/pets/{id}"]["post"]
+    form = post["requestBody"]["content"]["multipart/form-data"]["schema"]
+    assert form["properties"]["photo"] == {"type": "string", "format": "binary"}
+    assert form["required"] == ["photo"]
+
+    # Scoped OAuth2 was invisible before translation; it must now pass auth clarity.
+    result = run_audit(spec)
+    assert result["category_summary"]["auth_clarity"]["score"] == 100.0
+
+
+def test_cli_audits_swagger_2(tmp_path, capsys):
+    assert main([_write(tmp_path, SWAGGER_SPEC), "--quiet"]) in (0, 1)
+    assert "not supported" not in capsys.readouterr().err
 
 
 def test_cli_json_output_is_valid(tmp_path, capsys):

@@ -184,12 +184,11 @@ def _run(argv=None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_SPEC_ERROR
 
-    # Swagger 2.0 has `paths` too, but keeps auth in `securityDefinitions` and
-    # bodies in `in: body` params, so auditing it yields confidently wrong scores.
+    # Swagger 1.x has no `paths`-compatible layout; 2.0 is translated by load_spec.
     if isinstance(spec, dict) and "swagger" in spec:
         print(
-            f"error: Swagger {spec['swagger']} is not supported — only OpenAPI 3.x. "
-            "Convert it first (e.g. with swagger2openapi).",
+            f"error: Swagger {spec['swagger']} is not supported — only Swagger 2.0 "
+            "and OpenAPI 3.x.",
             file=sys.stderr,
         )
         return EXIT_SPEC_ERROR

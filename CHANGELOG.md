@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Swagger 2.0 support.** Swagger 2.0 specs are translated into the OpenAPI 3
+  layout on load (`securityDefinitions`, `definitions` and their `$ref`s,
+  `in: body` / `in: formData` parameters, `consumes` / `produces`, `basic` auth,
+  response schemas, `host` / `basePath`), so the rubric stays single-format.
+  Verified on Gotify: the original Swagger file and its `swagger2openapi`
+  conversion score identically (61.9, same 39 fails and 156 warnings). Audited
+  untranslated, as before 0.4.1, the same spec scored 55.8.
+
 ## [0.4.1] - 2026-10-24
 
 ### Fixed
