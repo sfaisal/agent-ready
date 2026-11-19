@@ -287,7 +287,8 @@ doesn't:
   is the costliest failure — that prior is untested here.
 - **Static analysis can't catch descriptions that are fluent but wrong.** Only
   running a real agent against the real API catches semantic inaccuracy.
-- **OpenAPI 3.x only.** Swagger 2.0 and AsyncAPI aren't supported yet.
+- **OpenAPI 3.x and Swagger 2.0.** Swagger 2.0 is translated to the OpenAPI 3
+  layout before auditing; AsyncAPI isn't supported yet.
 
 ## Related writing
 
@@ -299,7 +300,7 @@ doesn't:
 ## Roadmap
 
 - [ ] Embedding-based ambiguity detection
-- [ ] Swagger 2.0 support
+- [x] Swagger 2.0 support
 - [ ] Pagination and rate-limit documentation checks
 - [ ] LLM-assisted rewriting of flagged descriptions (`--fix`)
 - [ ] Live tool-selection testing against a generated MCP server
