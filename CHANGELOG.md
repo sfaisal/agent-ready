@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-19
+
 ### Added
 - **Swagger 2.0 support.** Swagger 2.0 specs are translated into the OpenAPI 3
   layout on load (`securityDefinitions`, `definitions` and their `$ref`s,
